@@ -55,8 +55,9 @@ jobs:
       - name: Wait until ready
         run: |
           for i in $(seq 1 60); do
+            # `|| true`: runner chay bash -e, curl exit 7 khi cong chua mo se giet script truoc khi retry.
             code=$(curl -s -o /dev/null -w '%{http_code}' -X POST localhost:8089/auth/login \
-              -H 'Content-Type: application/json' -d '{"username":"alice","password":"alice123"}')
+              -H 'Content-Type: application/json' -d '{"username":"alice","password":"alice123"}' || true)
             [ "$code" = 200 ] && echo "ready after ${i}s" && exit 0
             sleep 1
           done
