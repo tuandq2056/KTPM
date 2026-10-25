@@ -1,0 +1,55 @@
+services:
+  gateway:
+    image: nginx:1.27-alpine
+    volumes:
+      - ./gateway/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./gateway/proxy.conf:/etc/nginx/proxy.conf:ro
+    ports:
+      - "${GATEWAY_PORT:-8088}:8080" # gateway: JWT + rate limit 10 r/s
+      - "${GATEWAY_BENCH_PORT:-8089}:8081" # gateway: JWT, NO rate limit (chi dung de do do tre)
+    depends_on: [user-service, order-service, bff]
+
+  user-service:
+    build: ./services/user
+    environment:
+      JWT_SECRET: ${JWT_SECRET:-dev-secret-change-me}
+      MINIO_ENDPOINT: minio
+      MINIO_PORT: "9000"
+      # Host nam trong chu ky pre-signed URL: phai la host ma CLIENT goi duoc.
+      MINIO_PUBLIC_HOST: ${MINIO_PUBLIC_HOST:-localhost}
+      MINIO_PUBLIC_PORT: "9000"
+      MINIO_ACCESS_KEY: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-minioadmin}
+      MINIO_BUCKET: avatars
+    ports:
+      - "127.0.0.1:3001:3000" # chi de bench "goi thang service"
+    depends_on: [minio]
+
+  order-service:
+    build: ./services/order
+    ports:
+      - "127.0.0.1:3002:3000"
+
+  bff:
+    build: ./services/bff
+    environment:
+      JWT_SECRET: ${JWT_SECRET:-dev-secret-change-me}
+      USER_SERVICE_URL: http://user-service:3000
+      ORDER_SERVICE_URL: http://order-service:3000
+    depends_on: [user-service, order-service]
+
+  minio:
+    # minio/minio khong con tren Docker Hub; ban Chainguard van duoc duy tri.
+    image: cgr.dev/chainguard/minio:latest
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin}
+    ports:
+      - "9000:9000" # S3 API (client upload thang vao day bang pre-signed URL)
+      - "127.0.0.1:9001:9001" # console
+    volumes:
+      - minio-data:/data
+
+volumes:
+  minio-data:
