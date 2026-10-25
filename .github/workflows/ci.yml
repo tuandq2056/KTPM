@@ -11,17 +11,43 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  test:
+  # Unit test tung service (khong can Docker/MinIO).
+  unit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        service: [user, order, bff]
+    defaults:
+      run:
+        working-directory: services/${{ matrix.service }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: services/${{ matrix.service }}/package-lock.json
+      - run: npm ci
+      - run: node --check server.js
+      - run: npm test
+
+  # E2E tren stack that: nginx + 3 service + MinIO, gom ca kich ban chaos.
+  e2e:
+    needs: unit
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
 
-      - name: Validate configs
+      - name: Validate compose and scripts
         run: |
           docker compose config -q
-          for f in services/*/server.js scripts/bench.js; do node --check "$f"; done
-          bash -n scripts/smoke.sh
+          node --check scripts/bench.js
 
       - name: Build and start stack
         run: docker compose up -d --build
@@ -29,15 +55,15 @@ jobs:
       - name: Wait until ready
         run: |
           for i in $(seq 1 60); do
-            code=$(curl -s -o /dev/null -w '%{http_code}' -X POST localhost:8088/auth/login \
+            code=$(curl -s -o /dev/null -w '%{http_code}' -X POST localhost:8089/auth/login \
               -H 'Content-Type: application/json' -d '{"username":"alice","password":"alice123"}')
             [ "$code" = 200 ] && echo "ready after ${i}s" && exit 0
             sleep 1
           done
           echo "stack not ready (last http code: $code)"; exit 1
 
-      - name: Smoke test (5 requirements)
-        run: ./scripts/smoke.sh
+      - name: E2E tests (incl. chaos)
+        run: E2E_CHAOS=1 npm run test:e2e
 
       - name: Latency benchmark
         run: |
@@ -52,9 +78,9 @@ jobs:
         if: always()
         run: docker compose down -v
 
-  # CD: chi chay khi push len main va test da qua. Day image len GHCR.
+  # CD: chi chay khi push len main va TOAN BO test da qua. Day image len GHCR.
   publish:
-    needs: test
+    needs: [unit, e2e]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     permissions:

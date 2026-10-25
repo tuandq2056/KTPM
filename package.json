@@ -1,0 +1,10 @@
+{
+  "name": "ktpm",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "test:unit": "for s in user order bff; do (cd services/$s && npm test) || exit 1; done",
+    "test:e2e": "node --test --test-concurrency=1 tests/e2e/*.test.js",
+    "bench": "node scripts/bench.js"
+  }
+}
