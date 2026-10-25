@@ -72,7 +72,15 @@ jobs:
 
       - name: Dump logs on failure
         if: failure()
-        run: docker compose logs --no-color --tail=100
+        run: |
+          docker compose ps -a
+          docker compose logs --no-color --tail=60
+          # Dua log vao annotation de xem duoc ngay tren trang run (khong can tai log).
+          for svc in gateway user-service minio; do
+            body=$(docker compose logs --no-color --tail=25 "$svc" 2>&1 | tail -c 2500 \
+              | python3 -c 'import sys; print(sys.stdin.read().replace("%","%25").replace("\r","%0D").replace("\n","%0A"))')
+            echo "::error title=logs ${svc}::${body}"
+          done
 
       - name: Tear down
         if: always()
