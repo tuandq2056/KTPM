@@ -21,14 +21,14 @@ jobs:
         service: [user, order, bff]
     defaults:
       run:
-        working-directory: services/${{ matrix.service }}
+        working-directory: api-gateway-lab/services/${{ matrix.service }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: npm
-          cache-dependency-path: services/${{ matrix.service }}/package-lock.json
+          cache-dependency-path: api-gateway-lab/services/${{ matrix.service }}/package-lock.json
       - run: npm ci
       - run: node --check server.js
       - run: npm test
@@ -38,6 +38,9 @@ jobs:
     needs: unit
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: api-gateway-lab
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -115,7 +118,7 @@ jobs:
             type=raw,value=latest
       - uses: docker/build-push-action@v6
         with:
-          context: services/${{ matrix.service }}
+          context: api-gateway-lab/services/${{ matrix.service }}
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}

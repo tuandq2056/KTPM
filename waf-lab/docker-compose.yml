@@ -1,0 +1,12 @@
+# Bai thuc hanh: WAF tren Nginx (ModSecurity + OWASP CRS) dung truoc Juice Shop
+services:
+  web:
+    image: bkimminich/juice-shop
+    ports: ["3100:3000"] # vao thang web, KHONG qua WAF
+  waf:
+    image: owasp/modsecurity-crs:nginx
+    ports: ["8180:8080"] # qua WAF
+    environment:
+      BACKEND: http://web:3000
+      MODSEC_RULE_ENGINE: "On" # DetectionOnly = chi ghi log
+      BLOCKING_PARANOIA: "1" # 1-4, cang cao cang de chan nham
